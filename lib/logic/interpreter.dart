@@ -1,27 +1,27 @@
 import '../data/symbols.dart';
 
 class Interpreter {
-  // ============================================================
-  // 1. DİL ANALİZİ
-  // ============================================================
+  // =========================================================
+  // 1. TÜRKÇE METİN İŞLEME
+  // =========================================================
 
   static String _normalize(String text) {
     return text
         .toLowerCase()
-        .replaceAll('İ', 'i')
         .replaceAll('ı', 'i')
         .replaceAll('ğ', 'g')
         .replaceAll('ü', 'u')
         .replaceAll('ş', 's')
         .replaceAll('ö', 'o')
         .replaceAll('ç', 'c')
-        .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
 
-  static List<String> _tokenize(String text) {
+  static List<String> _words(String text) {
     final normalized = _normalize(text);
+
     if (normalized.isEmpty) return [];
 
     return normalized
@@ -30,507 +30,483 @@ class Interpreter {
         .toList();
   }
 
-  static bool _containsAny(String text, List<String> patterns) {
-    return patterns.any((pattern) => text.contains(pattern));
+  static bool _matches(String word, String root) {
+    final w = _normalize(word);
+    final r = _normalize(root);
+
+    if (w.isEmpty || r.isEmpty) return false;
+    if (w == r) return true;
+
+    // Kısa kelimelerde yanlış eşleşmeleri azalt.
+    if (r.length < 3) return false;
+
+    // Türkçe kelime eklerini kısmen destekle.
+    return w.startsWith(r);
   }
 
-  // ============================================================
-  // 2. OLAY VE EYLEM SÖZLÜĞÜ
-  //
-  // Eşleştirmeler, olayları analiz etmek için kullanılır.
-  // Bunlar tek başına kesin rüya anlamları değildir.
-  // ============================================================
+  static bool _hasPhrase(
+    List<String> words,
+    List<String> phrases,
+  ) {
+    for (final phrase in phrases) {
+      final parts = _words(phrase);
 
-  static const Map<String, List<String>> _eylemler = {
-    'yikama': [
-      'yika', 'yikani', 'yikand', 'yikiyor',
-      'yikad', 'yikan', 'yikamak',
+      if (parts.isEmpty || parts.length > words.length) {
+        continue;
+      }
+
+      for (int i = 0; i <= words.length - parts.length; i++) {
+        bool match = true;
+
+        for (int j = 0; j < parts.length; j++) {
+          if (!_matches(words[i + j], parts[j])) {
+            match = false;
+            break;
+          }
+        }
+
+        if (match) return true;
+      }
+    }
+
+    return false;
+  }
+
+  // =========================================================
+  // 2. OLAY TESPİTİ
+  // =========================================================
+
+  static const Map<String, List<String>> _eventPatterns = {
+    'sac_yikama': [
+      'saçımı yıkıyorum',
+      'saçlarımı yıkıyorum',
+      'saçımı yıkadım',
+      'saçlarımı yıkadım',
+      'saçımı yıkarken',
+      'saçlarımı yıkarken',
+      'saç yıkamak',
+      'saç yıkıyorum',
     ],
-    'kopma': [
-      'kop', 'koptu', 'kopuyor', 'kopmus',
-      'koparak', 'kopar', 'kopmas',
+    'sac_dokulmesi': [
+      'saçım dökülüyor',
+      'saçlarım dökülüyor',
+      'saçım döküldü',
+      'saçlarım döküldü',
+      'saçlarım kopuyor',
+      'saçlarım koptu',
+      'saçım kopuyor',
+      'saçım koptu',
+      'saçlarım kopup elime geldi',
+      'saçlarım tutam tutam kopuyor',
+      'saçlarım tutam tutam dökülüyor',
     ],
-    'dusme': [
-      'dus', 'dust', 'dusuyor', 'dusmus',
-      'duserek', 'dusmek',
-    ],
-    'ucma': [
-      'uc', 'uctu', 'ucuyor', 'ucmak',
-      'ucarak',
-    ],
-    'kacma': [
-      'kac', 'kacti', 'kaciyor', 'kacmak',
-      'kacarak',
+    'dis_dokulmesi': [
+      'dişim düştü',
+      'dişim döküldü',
+      'dişlerim döküldü',
+      'dişlerim dökülüyor',
     ],
     'kovalanma': [
-      'kovala', 'kovalani', 'kovaladi',
-      'kovaliyordu', 'takip',
+      'kovalanıyorum',
+      'beni kovalıyor',
+      'beni takip ediyor',
+      'peşimden geliyor',
     ],
-    'arama': [
-      'ara', 'ariyor', 'aradim', 'aramak',
-      'ararken',
+    'dusme': [
+      'yere düştüm',
+      'yüksekten düştüm',
+      'düşüyorum',
+      'uçurumdan düştüm',
     ],
-    'bulma': [
-      'bul', 'buldum', 'buldu', 'buluyor',
-      'bulmak',
+    'ucma': [
+      'uçuyorum',
+      'uçtum',
+      'havada uçuyordum',
     ],
-    'kaybetme': [
-      'kaybet', 'kaybettim', 'kaybol',
-      'kayboldum', 'kayboldu', 'kaybolmus',
+    'kacma': [
+      'kaçıyorum',
+      'kaçtım',
+      'kaçıp kurtuldum',
+    ],
+    'yilan_oldurme': [
+      'yılanı öldürdüm',
+      'yılan öldürdüm',
+      'yılanı öldürüyorum',
     ],
     'aglama': [
-      'agla', 'agladim', 'agliyor',
-      'agliyordum', 'aglamak',
+      'ağlıyorum',
+      'ağladım',
+      'ağlayarak',
     ],
-    'gulumseme': [
-      'gulumse', 'guldum', 'guluyordum',
-      'gulen', 'gulus',
-    ],
-    'konusma': [
-      'konus', 'konustum', 'konusuyor',
-      'konusmak', 'soyledi',
-    ],
-    'kavga': [
-      'kavga', 'dovus', 'vurdu',
-      'saldirdi', 'savas',
-    ],
-    'kurtulma': [
-      'kurtul', 'kurtuldum', 'kurtardi',
-      'kurtulmak',
-    ],
-    'olum': [
-      'oldu', 'olum', 'olmus', 'olmek',
-      'oldugunu',
-    ],
-    'dogum': [
-      'dogdu', 'dogum', 'dogur',
-      'bebek dog',
-    ],
-    'girme': [
-      'girdim', 'girdi', 'giriyor',
-      'girmek', 'icine girdim',
-    ],
-    'cikma': [
-      'ciktim', 'cikti', 'cikiyor',
-      'cikmak',
-    ],
-    'kirma': [
-      'kirdi', 'kirdim', 'kirildi',
-      'kiriliyor', 'kirmak',
-    ],
-    'kesme': [
-      'kesti', 'kestim', 'kesildi',
-      'kesiyor', 'kesmek',
-    ],
-    'kovma': [
-      'kovdu', 'kovuldum', 'kovmak',
-      'kovuyor',
+    'birini_kaybetme': [
+      'annemi kaybettim',
+      'babamı kaybettim',
+      'arkadaşımı kaybettim',
+      'eşimi kaybettim',
     ],
   };
 
-  // ============================================================
-  // 3. DUYGULAR
-  // ============================================================
+  static List<String> _detectEvents(List<String> words) {
+    final events = <String>[];
 
-  static const Map<String, List<String>> _duygular = {
+    for (final entry in _eventPatterns.entries) {
+      if (_hasPhrase(words, entry.value)) {
+        events.add(entry.key);
+      }
+    }
+
+    return events;
+  }
+
+  // =========================================================
+  // 3. DUYGU ANALİZİ
+  // =========================================================
+
+  static const Map<String, List<String>> _emotionPatterns = {
     'korku': [
-      'kork', 'dehset', 'panik', 'kabus',
-      'urktum', 'endiseliyim', 'tehlike',
-      'korkunc',
+      'korktum',
+      'korkuyorum',
+      'korkuyordum',
+      'dehşete düştüm',
+      'panikledim',
+      'ürktüm',
     ],
-    'uzuntu': [
-      'uzgun', 'uzuldum', 'uzuluyordum',
-      'agladim', 'agliyordum', 'huzun',
-      'aci cektim',
+    'üzüntü': [
+      'üzüldüm',
+      'üzgündüm',
+      'hüzünlendim',
+      'çok ağladım',
     ],
     'mutluluk': [
-      'mutlu', 'sevindim', 'sevincli',
-      'neseli', 'keyifli', 'guldum',
+      'mutluydum',
+      'çok mutlu oldum',
+      'sevindim',
+      'çok sevindim',
     ],
     'huzur': [
-      'huzur', 'rahatladim', 'sakindim',
-      'guvende', 'icim rahatti',
+      'huzurluydum',
+      'rahatlamıştım',
+      'kendimi güvende hissettim',
     ],
-    'ofke': [
-      'sinirlendim', 'ofkeliydim',
-      'kizdim', 'nefret', 'ofke',
+    'şaşkınlık': [
+      'şaşırdım',
+      'çok şaşırdım',
+      'hayrete düştüm',
     ],
-    'saskinlik': [
-      'sasirdim', 'saskindim',
-      'inanamadim', 'hayret',
-    ],
-    'tiksinme': [
-      'igrendim', 'tiksindim',
-      'mide bulantisi',
+    'öfke': [
+      'sinirlendim',
+      'çok öfkeliydim',
+      'kızgındım',
     ],
   };
 
-  static const Map<String, List<String>> _olumsuzluklar = {
-    'korku': ['korkmadim', 'korkmuyordum', 'korkmuyorum'],
-    'uzuntu': ['uzulmedim', 'aglamadim'],
-    'mutluluk': ['sevinmedim', 'mutlu degildim'],
-    'huzur': ['rahat degildim', 'huzursuzdum'],
+  static const Map<String, List<String>> _negativeEmotionPatterns = {
+    'korku': [
+      'korkmadım',
+      'korkmuyordum',
+      'korkmuyorum',
+    ],
+    'üzüntü': [
+      'üzülmedim',
+      'ağlamadım',
+    ],
+    'mutluluk': [
+      'mutlu değildim',
+      'sevinmedim',
+    ],
+    'huzur': [
+      'huzurlu değildim',
+      'rahat değildim',
+    ],
   };
 
-  // ============================================================
-  // 4. KELİME VE BAĞLAM EŞLEŞTİRMESİ
-  // ============================================================
-
-  static bool _kelimeEslesir(
-    String kelime,
-    String anahtar,
+  static List<String> _detectEmotions(
+    List<String> words,
+    String originalText,
   ) {
-    final k = _normalize(kelime);
-    final a = _normalize(anahtar);
+    final emotions = <String>[];
 
-    if (k.isEmpty || a.isEmpty) return false;
-    if (k == a) return true;
+    for (final entry in _emotionPatterns.entries) {
+      final negatives = _negativeEmotionPatterns[entry.key] ?? [];
 
-    // Türkçe ek almış kelimeler.
-    // Kısa kelimelerde gelişigüzel iç eşleşme yapılmaz.
-    if (a.length >= 3 && k.startsWith(a)) return true;
+      // "Korkmadım" ifadesini "korktum" olarak yorumlama.
+      if (_hasPhrase(words, negatives)) continue;
 
-    return false;
-  }
-
-  static bool _ifadeVar(
-    String metin,
-    List<String> ifadeler,
-  ) {
-    final kelimeler = _tokenize(metin);
-
-    for (final ifade in ifadeler) {
-      final ifadeKelimeleri = _tokenize(ifade);
-      if (ifadeKelimeleri.isEmpty) continue;
-
-      for (int i = 0;
-          i <= kelimeler.length - ifadeKelimeleri.length;
-          i++) {
-        bool eslesti = true;
-
-        for (int j = 0; j < ifadeKelimeleri.length; j++) {
-          if (!_kelimeEslesir(
-            kelimeler[i + j],
-            ifadeKelimeleri[j],
-          )) {
-            eslesti = false;
-            break;
-          }
-        }
-
-        if (eslesti) return true;
+      if (_hasPhrase(words, entry.value)) {
+        emotions.add(entry.key);
       }
     }
 
-    return false;
+    return emotions;
   }
 
-  static List<String> _tespitEt(
-    String metin,
-    Map<String, List<String>> sozluk,
+  // =========================================================
+  // 4. SEMBOL TESPİTİ
+  // =========================================================
+
+  static List<Ruyasembolu> _detectSymbols(
+    List<String> words,
   ) {
-    final bulunanlar = <String>[];
+    final results = <Ruyasembolu>[];
+    final foundKeys = <String>{};
 
-    for (final entry in sozluk.entries) {
-      if (_ifadeVar(metin, entry.value)) {
-        bulunanlar.add(entry.key);
-      }
-    }
-
-    return bulunanlar;
-  }
-
-  // ============================================================
-  // 5. SEMBOL TESPİTİ
-  // ============================================================
-
-  static List<Ruyasembolu> _sembolleriBul(String metin) {
-    final bulunanlar = <Ruyasembolu>[];
-    final anahtarlar = <String>{};
-    final kelimeler = _tokenize(metin);
-
-    for (final sembol in tumSemboller) {
-      final anahtar = _normalize(sembol.anahtar);
-
-      if (anahtarlar.contains(anahtar)) continue;
-
-      final eslesmeler = <String>[
-        sembol.anahtar,
-        ...sembol.eslesenKelimeler,
+    for (final symbol in tumSemboller) {
+      final candidates = <String>[
+        symbol.anahtar,
+        ...symbol.eslesenKelimeler,
       ];
 
-      bool bulundu = false;
+      bool found = false;
 
-      for (final eslesme in eslesmeler) {
-        final aranacak = _tokenize(eslesme);
-
-        if (aranacak.isEmpty) continue;
-
-        for (int i = 0;
-            i <= kelimeler.length - aranacak.length;
-            i++) {
-          bool eslesti = true;
-
-          for (int j = 0; j < aranacak.length; j++) {
-            if (!_kelimeEslesir(
-              kelimeler[i + j],
-              aranacak[j],
-            )) {
-              eslesti = false;
-              break;
-            }
-          }
-
-          if (eslesti) {
-            bulundu = true;
-            break;
-          }
+      for (final candidate in candidates) {
+        if (_hasPhrase(words, [candidate])) {
+          found = true;
+          break;
         }
-
-        if (bulundu) break;
       }
 
-      if (bulundu) {
-        bulunanlar.add(sembol);
-        anahtarlar.add(anahtar);
+      if (found && foundKeys.add(symbol.anahtar)) {
+        results.add(symbol);
       }
     }
 
-    return bulunanlar;
+    return results;
   }
 
-  // ============================================================
-  // 6. OLAYLAR ARASINDAKİ İLİŞKİLER
-  //
-  // Bu bölüm rüyanın bütününü değerlendirmeye çalışır.
-  // ============================================================
+  // =========================================================
+  // 5. BAĞLAM ANALİZİ
+  // =========================================================
 
-  static List<String> _iliskileriAnalizEt({
-    required String metin,
-    required List<String> eylemler,
-    required List<String> duygular,
-    required List<Ruyasembolu> semboller,
+  static List<String> _analyzeContext({
+    required List<String> events,
+    required List<String> emotions,
+    required List<Ruyasembolu> symbols,
   }) {
-    final sonuc = <String>[];
-    final normal = _normalize(metin);
+    final results = <String>[];
 
-    final eylemSeti = eylemler.toSet();
-    final duyguSeti = duygular.toSet();
+    final eventSet = events.toSet();
+    final emotionSet = emotions.toSet();
 
-    // Bir olay sırasında kayıp veya zarar oluşması.
-    if (eylemSeti.contains('yikama') &&
-        eylemSeti.contains('kopma')) {
-      sonuc.add(
-        'Rüyada temizlenme veya yenilenme çağrışımı yapan '
-        'bir eylem ile kayıp görüntüsü aynı olayda birleşiyor. '
-        'Bu karşıtlık, bir değişim isteğiyle bir şeyi kaybetme '
-        'endişesinin birlikte düşünülmesini mümkün kılıyor.',
+    // Saç yıkama ve saç dökülmesi aynı olay zincirinde.
+    if (eventSet.contains('sac_yikama') &&
+        eventSet.contains('sac_dokulmesi')) {
+      results.add(
+        'Rüyanın merkezinde saç yıkama sırasında saçların '
+        'kopması bulunuyor. Burada yalnızca saç sembolü '
+        'değil, yenilenme veya temizlenme çağrışımı yapan '
+        'eylem ile kayıp görüntüsü arasındaki ilişki de '
+        'önemli. Bu durum değişim isteğiyle kaybetme '
+        'endişesinin birlikte değerlendirilmesine imkân '
+        'verebilir; ancak tek başına kesin bir anlam taşımaz.',
       );
     }
 
-    // Tehdit ve kaçış.
-    if (eylemSeti.contains('kovalanma') &&
-        eylemSeti.contains('kacma')) {
-      sonuc.add(
-        'Takip edilme ve kaçma olayları birlikte görülüyor. '
-        'Bu, rüya bağlamında baskı altında hissetme veya '
-        'bir sorunla yüzleşememe ihtimali üzerinden incelenebilir.',
+    // Yılan görmek ile yılan öldürmek aynı değildir.
+    if (eventSet.contains('yilan_oldurme')) {
+      results.add(
+        'Rüyada yılanı öldürme eylemi anlatılmış. '
+        'Bu nedenle yalnızca yılan sembolünün genel '
+        'yorumuna dayanmak yerine, rüyadaki eylemi ve '
+        'sonrasında ne olduğunu değerlendirmek gerekir.',
       );
     }
 
-    // Kayıp ve üzüntü.
-    if ((eylemSeti.contains('kaybetme') ||
-            eylemSeti.contains('kopma')) &&
-        duyguSeti.contains('uzuntu')) {
-      sonuc.add(
-        'Kayıp görüntüsü ile üzüntü aynı anlatıda yer alıyor. '
-        'Bu nedenle yorumda yalnızca değişim değil, '
-        'kaybedilen şeyin duygusal önemi de dikkate alınmalı.',
+    if (eventSet.contains('kovalanma') &&
+        eventSet.contains('kacma')) {
+      results.add(
+        'Takip edilme ve kaçma birlikte görülüyor. '
+        'Bu olay dizisi, rüya bağlamında baskı altında '
+        'hissetme veya bir sorundan uzaklaşma ihtimali '
+        'üzerinden düşünülebilir.',
       );
     }
 
-    // Korku ve kurtuluş.
-    if (duyguSeti.contains('korku') &&
-        eylemSeti.contains('kurtulma')) {
-      sonuc.add(
-        'Rüyada korku ile kurtulma birlikte bulunuyor. '
-        'Bu durum yalnızca tehdit hissini değil, '
-        'tehlikeden uzaklaşma veya rahatlama temasını da '
-        'değerlendirmeyi gerektiriyor.',
-      );
-    }
-
-    // Düşme ve korku.
-    if (eylemSeti.contains('dusme') &&
-        duyguSeti.contains('korku')) {
-      sonuc.add(
+    if (eventSet.contains('dusme') &&
+        emotionSet.contains('korku')) {
+      results.add(
         'Düşme olayı korkuyla birlikte anlatılmış. '
-        'Bu bağlamda güvensizlik veya kontrol kaybı ihtimali '
-        'değerlendirilebilir; ancak tek başına kesin bir '
-        'anlam çıkarılamaz.',
+        'Bu, kontrol kaybı veya güvensizlik hissiyle '
+        'ilişkili olabilir; fakat kişisel bağlam '
+        'bilinmeden kesin sonuca varılamaz.',
       );
     }
 
-    // Tehdit ve huzur gibi karşıt duygular.
-    if (duyguSeti.contains('korku') &&
-        (duyguSeti.contains('huzur') ||
-            duyguSeti.contains('mutluluk'))) {
-      sonuc.add(
-        'Rüyada hem olumsuz hem olumlu duygulara işaret eden '
-        'ifadeler var. Bu, rüyanın tek bir duyguya '
-        'indirgenmemesi gerektiğini gösteriyor.',
+    if (emotionSet.contains('korku') &&
+        emotionSet.contains('mutluluk')) {
+      results.add(
+        'Rüyada korku ve mutluluğa işaret eden '
+        'ifadeler birlikte bulunuyor. Bu nedenle '
+        'rüyanın duygusal tonunu tek bir duyguya '
+        'indirgememek gerekir.',
       );
     }
 
-    // Sembol ve olay ilişkileri için genel kontrol.
-    if (semboller.length >= 2) {
-      sonuc.add(
-        'Rüyada birden fazla sembol bulunuyor. Bunları '
-        'birbirinden bağımsız yorumlamak yerine, hangi '
-        'olayın içinde yer aldıklarını ve anlatıda nasıl '
-        'bir araya geldiklerini değerlendirmek gerekir.',
+    if (symbols.length >= 2 && results.isEmpty) {
+      results.add(
+        'Birden fazla sembol tespit edildi. Ancak '
+        'mevcut kurallar bu semboller arasında özel '
+        'bir ilişki belirleyemedi. Sadece birlikte '
+        'görünmelerinden kesin bir anlam çıkarılmamalı.',
       );
     }
 
-    // Genel bağlam, yalnızca belirli kuralların çalışmasına bağlı değil.
-    if (sonuc.isEmpty && normal.isNotEmpty) {
-      sonuc.add(
-        'Mevcut kurallarla belirgin bir olay ilişkisi '
-        'kurulamadı. Bu nedenle sembollerin anlamlarını '
-        'kesin bir sonuca dönüştürmek yerine, rüyanın '
-        'anlatılan ayrıntıları üzerinden değerlendirmek gerekir.',
+    if (results.isEmpty) {
+      results.add(
+        'Mevcut olay kuralları bu rüya için özgün '
+        'bir ilişki belirleyemedi. Bu, rüyanın '
+        'anlamsız olduğu anlamına gelmez; yorum için '
+        'daha fazla olay ayrıntısı gerekebilir.',
       );
     }
 
-    return sonuc;
+    return results;
   }
 
-  // ============================================================
-  // 7. DUYGU ANALİZİ
-  // ============================================================
-
-  static String _duyguOzeti(
-    List<String> duygular,
-    String metin,
-  ) {
-    if (duygular.isEmpty) {
-      return 'Rüyanızda hissettiğiniz duygu açıkça '
-          'belirtilmediği için duygusal tonunu kesinleştiremiyorum.';
-    }
-
-    final aciklamalar = <String, String>{
-      'korku': 'korku veya tedirginlik',
-      'uzuntu': 'üzüntü veya kayıp hissi',
-      'mutluluk': 'mutluluk veya sevinç',
-      'huzur': 'huzur veya rahatlama',
-      'ofke': 'öfke veya kızgınlık',
-      'saskinlik': 'şaşkınlık',
-      'tiksinme': 'tiksinme',
-    };
-
-    final tespitEdilenler = duygular
-        .map((duygu) => aciklamalar[duygu])
-        .whereType<String>()
-        .toList();
-
-    return 'Metninizde şu duygulara işaret eden ifadeler '
-        'bulunuyor: ${tespitEdilenler.join(", ")}. '
-        'Bu tespit, yalnızca yazdığınız ifadelerin '
-        'dilsel analizine dayanıyor.';
-  }
-
-  // ============================================================
-  // 8. ANA YORUMLAMA MOTORU
-  // ============================================================
+  // =========================================================
+  // 6. ANA YORUMLAMA MOTORU
+  // =========================================================
 
   static String yorumla(String metin) {
     if (metin.trim().isEmpty) {
-      return 'Lütfen yorumlamamı istediğiniz rüyayı anlatın.';
+      return 'Lütfen rüyanızı anlatın.';
     }
 
-    final semboller = _sembolleriBul(metin);
-    final eylemler = _tespitEt(metin, _eylemler);
-    final duygular = _tespitEt(metin, _duygular);
+    final words = _words(metin);
+
+    final events = _detectEvents(words);
+    final emotions = _detectEmotions(words, metin);
+    final symbols = _detectSymbols(words);
+
+    final context = _analyzeContext(
+      events: events,
+      emotions: emotions,
+      symbols: symbols,
+    );
 
     final buffer = StringBuffer();
 
-    buffer.writeln('RÜYANIN GENEL ANALİZİ\n');
+    buffer.writeln('RÜYANIN BÜTÜNSEL ANALİZİ\n');
 
-    buffer.writeln(_duyguOzeti(duygular, metin));
+    // A. Olaylar
+    if (events.isNotEmpty) {
+      buffer.writeln('Rüyada tespit edilen olaylar:');
+
+      for (final event in events) {
+        buffer.writeln('• ${_eventName(event)}');
+      }
+
+      buffer.writeln();
+    }
+
+    // B. Duygular
+    buffer.writeln('DUYGUSAL ANALİZ\n');
+
+    if (emotions.isEmpty) {
+      buffer.writeln(
+        'Rüyanızdaki duygular açıkça belirtilmemiş. '
+        'Bu nedenle korku, huzur veya üzüntü hissettiğinizi '
+        'varsaymıyorum.',
+      );
+    } else {
+      buffer.writeln(
+        'Anlatımınızda şu duygulara işaret eden ifadeler '
+        'bulunuyor: ${emotions.join(', ')}.',
+      );
+
+      buffer.writeln(
+        'Bu tespit yazdığınız ifadelerle sınırlıdır; '
+        'duygularınızın tamamını bildiğim anlamına gelmez.',
+      );
+    }
+
     buffer.writeln();
 
-    // Sembolleri ve eylemleri birbirinden ayır.
-    if (semboller.isNotEmpty) {
-      buffer.writeln('RÜYADA TESPİT EDİLEN SEMBOLLER\n');
+    // C. Semboller
+    buffer.writeln('SEMBOLLER\n');
 
-      for (final sembol in semboller) {
-        buffer.writeln('• ${sembol.anahtar}');
-        buffer.writeln(sembol.yorum);
+    if (symbols.isEmpty) {
+      buffer.writeln(
+        'Bilinen sembollerle güvenilir bir eşleşme '
+        'kurulamadı. Buna rağmen rüyanızdaki olaylar '
+        'anlamlı ayrıntılar içerebilir.',
+      );
+    } else {
+      for (final symbol in symbols) {
+        // Saç kesmek hakkındaki yorumu, saç dökülmesi
+        // rüyasına doğrudan uygulama.
+        if (_normalize(symbol.anahtar) == 'sac' &&
+            events.contains('sac_dokulmesi')) {
+          buffer.writeln('• SAÇ');
+
+          buffer.writeln(
+            'Bu rüyada saç kesilmekten ziyade saçların '
+            'kopması veya dökülmesi anlatılıyor. Bu '
+            'nedenle saç kesmeye ilişkin geleneksel '
+            'yorum bu olaya doğrudan uygulanmamalıdır.',
+          );
+        } else {
+          buffer.writeln('• ${symbol.anahtar.toUpperCase()}');
+          buffer.writeln(symbol.yorum);
+        }
+
         buffer.writeln();
       }
     }
 
-    if (eylemler.isNotEmpty) {
-      buffer.writeln('RÜYADAKİ EYLEMLER\n');
+    // D. Olaylar arası ilişki
+    buffer.writeln('OLAYLAR ARASINDAKİ İLİŞKİ\n');
 
-      buffer.writeln(
-        'Anlatınızda şu eylemlere işaret eden ifadeler '
-        'bulunuyor: ${eylemler.join(", ")}.',
-      );
-
-      buffer.writeln();
+    for (final item in context) {
+      buffer.writeln('• $item\n');
     }
 
-    // Olay ilişkilerini birlikte değerlendir.
-    final iliskiler = _iliskileriAnalizEt(
-      metin: metin,
-      eylemler: eylemler,
-      duygular: duygular,
-      semboller: semboller,
-    );
+    // E. Kişisel bağlam
+    buffer.writeln('KİŞİSEL DEĞERLENDİRME\n');
 
-    buffer.writeln('BÜTÜNSEL DEĞERLENDİRME\n');
-
-    for (final iliski in iliskiler) {
-      buffer.writeln('• $iliski');
-      buffer.writeln();
-    }
-
-    // Kullanıcıya özgü yorum için eksik bilgileri belirle.
-    buffer.writeln('KİŞİSEL BAĞLAM\n');
-
-    if (duygular.isEmpty) {
+    if (emotions.isEmpty) {
       buffer.writeln(
-        'Bu rüyayı daha iyi değerlendirmek için '
-        'rüya sırasında ne hissettiğinizi bilmek isterim.',
-      );
-    } else if (semboller.isEmpty) {
-      buffer.writeln(
-        'Anlatınızda mevcut sembol veritabanıyla '
-        'eşleştirebildiğim bir sembol bulunmadı. '
-        'Bu, rüyanızın anlamsız olduğu anlamına gelmez.',
+        'Rüya sırasında ne hissettiğiniz yorumu '
+        'değiştirebilir. Örneğin korku, rahatlama veya '
+        'şaşkınlık yaşadınız mı?',
       );
     } else {
       buffer.writeln(
-        'Bu rüyanın sizin için ne ifade ettiğini '
-        'anlamak için, rüyadaki olayların gerçek '
-        'yaşamınızda size ne çağrıştırdığını düşünmek '
-        'yararlı olabilir.',
+        'Rüyadaki olayların sizin için ne ifade ettiğini '
+        'anlamak için şu soruyu düşünebilirsiniz: '
+        'Bu olay size gerçek yaşamınızda yaşadığınız '
+        'bir değişimi, endişeyi veya anıyı çağrıştırıyor mu?',
       );
     }
 
     buffer.writeln();
 
-    buffer.writeln('SONUÇ\n');
+    buffer.writeln('ÖNEMLİ NOT\n');
 
     buffer.writeln(
-      'Bu değerlendirme, metninizden tespit edilen '
-      'sembollere, eylemlere ve duygu ifadelerine '
-      'dayanan yerel bir kural tabanlı analizdir. '
-      'Olası anlamları düşünmenize yardımcı olabilir; '
-      'kesin bir kehanet veya psikolojik teşhis değildir.',
+      'Bu yorum, cihaz üzerinde çalışan kural tabanlı '
+      'bir analizdir. Rüyaların geleceği haber verdiği '
+      'kanıtlanmış değildir. Geleneksel sembol yorumları '
+      'kesin dini hükümler veya kişisel geleceğe dair '
+      'kanıtlar olarak değerlendirilmemelidir.',
     );
 
     return buffer.toString().trim();
+  }
+
+  static String _eventName(String event) {
+    const names = {
+      'sac_yikama': 'Saç yıkama',
+      'sac_dokulmesi': 'Saçların dökülmesi veya kopması',
+      'dis_dokulmesi': 'Dişlerin dökülmesi',
+      'kovalanma': 'Takip edilme',
+      'dusme': 'Düşme',
+      'ucma': 'Uçma',
+      'kacma': 'Kaçma',
+      'yilan_oldurme': 'Yılan öldürme',
+      'aglama': 'Ağlama',
+      'birini_kaybetme': 'Yakın birini kaybetme',
+    };
+
+    return names[event] ?? event;
   }
 }
