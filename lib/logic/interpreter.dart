@@ -21,7 +21,6 @@ class Interpreter {
   static String _kokBul(String kelime) {
     String kok = kelime;
     
-    // Ekleri temizle (En uzun eki bulup kes)
     for (String ek in _ekler) {
       if (kok.endsWith(ek) && kok.length > ek.length + 2) {
         kok = kok.substring(0, kok.length - ek.length);
@@ -29,10 +28,7 @@ class Interpreter {
       }
     }
     
-    // Ünsüz Yumuşaması Düzeltmesi (Ör: ekmeği -> ekmek, ağzı -> ağız, rengi -> renk)
-    // Eğer kelime 'ğ', 'b', 'c', 'd', 'g' ile bitiyorsa, sert karşılıklarını da kontrol etmek gerekir.
-    // Ancak basitlik adına, "ağz" gibi kalan kökleri "ağız"a çevirelim.
-    if (kok.endsWith('ğ')) kok = kok.replaceAll('ğ', 'k'); // ağz -> ağız (aşağıda tamamlanacak)
+    if (kok.endsWith('ğ')) kok = kok.replaceAll('ğ', 'k');
     if (kok.endsWith('b')) kok = kok.replaceAll('b', 'p');
     if (kok.endsWith('c')) kok = kok.replaceAll('c', 'ç');
     if (kok.endsWith('d')) kok = kok.replaceAll('d', 't');
@@ -43,7 +39,6 @@ class Interpreter {
   static String yorumla(String metin) {
     final kucukMetin = metin.toLowerCase();
     
-    // Noktalama işaretlerini temizle ve kelimelere ayır
     final temizMetin = kucukMetin.replaceAll(RegExp(r'[^\w\sğüşıöç]'), ' ');
     final kelimeler = temizMetin.split(RegExp(r'\s+')).where((k) => k.isNotEmpty).toList();
     
@@ -59,21 +54,10 @@ class Interpreter {
         for (final kelime in kelimeler) {
           final kok = _kokBul(kelime);
           
-          // A) Tam Eşleşme
           if (kelime == eslesen) { bulundu = true; break; }
-          
-          // B) Kök Eşleşmesi (ör: saçlarım -> saç)
           if (kok == eslesen) { bulundu = true; break; }
-
-          // C) Başlangıç Eşleşmesi (ör: yılanı -> yılan)
-          if (kelime.startsWith(eslesen) && eslesen.length >= 3) { 
-            bulundu = true; break; 
-          }
-          
-          // D) İçinde Geçme (Sadece 4+ harfli semboller için: yıkıyorum içinde yıka)
-          if (eslesen.length >= 4 && kelime.contains(eslesen)) {
-            bulundu = true; break;
-          }
+          if (kelime.startsWith(eslesen) && eslesen.length >= 3) { bulundu = true; break; }
+          if (eslesen.length >= 4 && kelime.contains(eslesen)) { bulundu = true; break; }
         }
         
         if (bulundu) {
@@ -88,32 +72,29 @@ class Interpreter {
       return 'Rüyanızda bilinen bir sembol tespit edilemedi. Lütfen rüyanızı daha detaylı anlatın veya farklı kelimeler kullanın. (İpucu: Su, yılan, uçmak, ev, saç gibi net kelimeler kullanmayı deneyin.)';
     }
 
-    // --- 3. DUYGU VE BAĞLAM ANALİZİ (Psikolojik Akıl Yürütme) ---
-    bool korkuVar = kucukMetin.contains('korku') || kucukMetin.contains('kabus') || kucukMetin.contains('dehşet') || kucukMetin.contains('kaçtım');
-    bool hüzünVar = kucukMetin.contains('hüzün') || kucukMetin.contains('ağla') || kucukMetin.contains('üzgün') || kucukMetin.contains('kayıp');
-    bool mutlulukVar = kucukMetin.contains('mutlu') || kucukMetin.contains('sevinç') || kucukMetin.contains('gül') || kucukMetin.contains('huzur');
+    // --- 3. DUYGU VE BAĞLAM ANALİZİ (İngilizce değişken isimleriyle) ---
+    bool hasFear = kucukMetin.contains('korku') || kucukMetin.contains('kabus') || kucukMetin.contains('dehşet') || kucukMetin.contains('kaçtım');
+    bool hasSadness = kucukMetin.contains('hüzün') || kucukMetin.contains('ağla') || kucukMetin.contains('üzgün') || kucukMetin.contains('kayıp');
+    bool hasJoy = kucukMetin.contains('mutlu') || kucukMetin.contains('sevinç') || kucukMetin.contains('gül') || kucukMetin.contains('huzur');
 
     final buffer = StringBuffer();
     
-    // Rüya Analizi Girişi
     buffer.writeln('--- RÜYA ANALİZİ ---\n');
     
-    if (korkuVar) {
+    if (hasFear) {
       buffer.writeln('Rüyanızda hissettiğiniz korku ve endişe, günlük hayatınızdaki bastırılmış duyguların veya çözülmemiş bir stresin dışa vurumu olabilir. Bilinçaltınız sizi uyarıyor.\n');
-    } else if (hüzünVar) {
+    } else if (hasSadness) {
       buffer.writeln('Rüyanızdaki hüzün ve melankoli, geçmişte yaşadığınız ve hala tam olarak atlatamadığınız bir olayın yansıması olabilir. İçsel bir arınma sürecinde olabilirsiniz.\n');
-    } else if (mutlulukVar) {
+    } else if (hasJoy) {
       buffer.writeln('Rüyanızdaki pozitif enerji ve huzur, bilinçaltınızın dingin olduğunu ve hayatınızdaki güzel gelişmelere açık olduğunuzu gösteriyor.\n');
     } else {
       buffer.writeln('Rüyanız sembolik bir dille bilinçaltınızdan size mesajlar veriyor. İşte tespit edilen sembollerin geleneksel ve psikolojik yorumları:\n');
     }
 
-    // Sembol Yorumları
     for (int i = 0; i < bulunanlar.length; i++) {
       buffer.writeln('${i + 1}. ${bulunanlar[i].yorum}\n');
     }
 
-    // Kapanış
     buffer.writeln('---');
     buffer.writeln('Not: Bu yorumlar geleneksel İslami tabir geleneğine dayanmaktadır ve sadece eğlence amaçlıdır. Psikolojik analizler bilimsel bir teşhis değildir.');
 
