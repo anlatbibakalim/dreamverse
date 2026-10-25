@@ -1,149 +1,176 @@
 import '../data/symbols.dart';
 
-// 1. ADIM: Duygu ve Yoğunluk Sözlükleri
-final Map<String, double> korkuKelimeleri = {
-  'korku': 2, 'korktum': 2, 'korkuyorum': 2, 'kabus': 3, 'dehşet': 3,
-  'kaçtım': 2, 'kaçıyordum': 2, 'saldırdı': 3, 'tehlike': 2, 'ürktüm': 2
-};
-
-final Map<String, double> huzunKelimeleri = {
-  'hüzün': 2, 'ağladım': 2, 'ağlıyordum': 2, 'üzgün': 2, 'kaybettim': 3, 'ayrılık': 2
-};
-
-final Map<String, double> mutlulukKelimeleri = {
-  'mutlu': 2, 'sevinç': 2, 'güldüm': 2, 'huzur': 2, 'başarı': 2, 'sevdim': 1
-};
-
-final Map<String, double> yogunlukKelimeleri = {
-  'çok': 1.5, 'çook': 2, 'aşırı': 2, 'dehşet': 2, 'biraz': 0.7, 'hafif': 0.6
-};
-
-final List<String> olumsuzluklar = [
-  'değil', 'değildi', 'yok', 'yoktu', 'görmedim', 'olmadı', 'korkmuyorum', 'korkmadım', 'hiç'
-];
-
-// 2. ADIM: Eylem Sözlüğü
-final Map<String, String> eylemYorumlari = {
-  'kovalamak': 'Kaçınan veya yüzleşmekten çekindiğiniz bir konu sizi takip ediyor.',
-  'kovaladı': 'Kaçınan veya yüzleşmekten çekindiğiniz bir konu sizi takip ediyor.',
-  'kovalıyordu': 'Kaçınan veya yüzleşmekten çekindiğiniz bir konu sizi takip ediyor.',
-  'ölmek': 'Bir dönemin, ilişkinin ya da alışkanlığın sona ermesi sembolize ediliyor.',
-  'öldü': 'Bir dönemin, ilişkinin ya da alışkanlığın sona ermesi sembolize ediliyor.',
-  'uçmak': 'Özgürlük, kontrol ve hedeflerinize ulaşma arzusu öne çıkıyor.',
-  'uçtum': 'Özgürlük, kontrol ve hedeflerinize ulaşma arzusu öne çıkıyor.',
-  'kaybetmek': 'Değer verdiğiniz bir şeyin kontrolünüzden çıktığı hissi var.',
-  'kaybettim': 'Değer verdiğiniz bir şeyin kontrolünüzden çıktığı hissi var.',
-  'ağlamak': 'Bastırılmış bir üzüntünün ifade bulmaya çalıştığını gösterir.',
-  'ağladım': 'Bastırılmış bir üzüntünün ifade bulmaya çalıştığını gösterir.'
-};
-
 class Interpreter {
-  static String yorumla(String metin) {
-    final kucukMetin = metin.toLowerCase();
-    final temizMetin = kucukMetin.replaceAll(RegExp(r'[^\w\sğüşıöç]'), ' ');
-    final kelimeler = temizMetin.split(RegExp(r'\s+')).where((k) => k.isNotEmpty).toList();
+  // 1. DUYGU SÖZLÜKLERİ
+  static final Map<String, double> korkuKelimeleri = {
+    'korku': 2.0, 'korktum': 2.0, 'korkuyorum': 2.0, 'kabus': 3.0, 'dehşet': 3.0,
+    'kaçtım': 2.0, 'kaçıyordum': 2.0, 'saldırdı': 3.0, 'tehlike': 2.0, 'ürktüm': 2.0, 'kan': 1.0
+  };
+
+  static final Map<String, double> huzunKelimeleri = {
+    'hüzün': 2.0, 'ağladım': 2.0, 'ağlıyordum': 2.0, 'üzgün': 2.0, 'kaybettim': 3.0, 'ayrılık': 2.0, 'koptu': 1.5
+  };
+
+  static final Map<String, double> mutlulukKelimeleri = {
+    'mutlu': 2.0, 'sevinç': 2.0, 'güldüm': 2.0, 'huzur': 2.0, 'başarı': 2.0, 'sevdim': 1.0
+  };
+
+  static final Map<String, double> yogunlukKelimeleri = {
+    'çok': 1.5, 'çook': 2.0, 'aşırı': 2.0, 'dehşet': 2.0, 'biraz': 0.7, 'hafif': 0.6
+  };
+
+  static final List<String> olumsuzluklar = [
+    'değil', 'değildi', 'yok', 'yoktu', 'görmedim', 'olmadı', 'korkmuyorum', 'korkmadım', 'hiç'
+  ];
+
+  // 2. EYLEM SÖZLÜĞÜ (Yorumu zenginleştirmek için)
+  static final Map<String, String> eylemYorumlari = {
+    'kovala': 'Kaçınan veya yüzleşmekten çekindiğiniz bir konunun sizi takip ettiğini görüyorum.',
+    'öl': 'Bir dönemin, ilişkinin ya da alışkanlığın sona ermesi ve yenilenme ihtiyacı.',
+    'uç': 'Özgürlük, kontrol ve hedeflerinize ulaşma arzusu öne çıkıyor.',
+    'kaybet': 'Değer verdiğiniz bir şeyin kontrolünüzden çıktığı hissini taşıyorsunuz.',
+    'ağla': 'Bastırılmış bir üzüntünün veya içsel boşalmanın ifade bulmaya çalıştığını gösterir.',
+    'yıka': 'Geçmişten veya bir olaydan arınma, temizlenme ve yeniden başlama isteği.',
+    'kop': 'Hayatınızdaki bir bağın zayıfladığını veya sizi yoran bir durumdan kurtulma isteğini simgeler.',
+  };
+
+  // 3. TÜRKÇE KÖK BULUCU (Ünlü düşmesi ve Ünsüz yumuşamasını tolere eder)
+  static String _kokBul(String kelime) {
+    if (kelime.length <= 3) return kelime;
     
-    final List<Ruyasembolu> bulunanlar = [];
-    final Set<String> bulunanAnahtarlar = {};
-    final List<String> bulunanEylemler = [];
-
-    // 3. ADIM: Kök Bulucu (Önceki dersteki gibi geniş)
-    String kokBul(String k) {
-      if (k.length <= 3) return k;
-      if (k.endsWith('ğı') || k.endsWith('ği')) return k.substring(0, k.length - 2) + 'k';
-      if (k.endsWith('lar') || k.endsWith('ler')) return k.substring(0, k.length - 3);
-      if (k.endsWith('ı') || k.endsWith('i') || k.endsWith('u') || k.endsWith('ü')) return k.substring(0, k.length - 1);
-      if (k.endsWith('yor') || k.endsWith('yordu') || k.endsWith('yorum')) return k.substring(0, k.length - 4);
-      if (k.endsWith('dı') || k.endsWith('di')) return k.substring(0, k.length - 2);
-      return k;
+    // Yaygın ekleri kes
+    List<String> ekler = ['larından', 'lerinden', 'ları', 'leri', 'lar', 'ler', 'ım', 'im', 'um', 'üm', 'ın', 'in', 'un', 'ün', 'ı', 'i', 'u', 'ü', 'yı', 'yi', 'yu', 'yü', 'da', 'de', 'ta', 'te', 'dan', 'den', 'tan', 'ten', 'a', 'e', 'ya', 'ye', 'yor', 'yordu', 'yorum', 'dı', 'di', 'du', 'dü', 'mış', 'miş', 'muş', 'müş'];
+    
+    String kok = kelime;
+    for (String ek in ekler) {
+      if (kok.endsWith(ek) && kok.length > ek.length + 2) {
+        kok = kok.substring(0, kok.length - ek.length);
+        break;
+      }
     }
+    
+    // Ünsüz yumuşaması (ağz -> ağız, ekmeğ -> ekmek)
+    if (kok.endsWith('ğ')) kok = kok.replaceAll('ğ', 'k');
+    if (kok.endsWith('b')) kok = kok.replaceAll('b', 'p');
+    if (kok.endsWith('c')) kok = kok.replaceAll('c', 'ç');
+    if (kok.endsWith('d')) kok = kok.replaceAll('d', 't');
+    
+    return kok;
+  }
 
-    // 4. ADIM: Sembolleri ve Eylemleri Bul
-    for (final sembol in tumSemboller) {
-      for (final eslesen in sembol.eslesenKelimeler) {
-        bool bulundu = false;
-        for (int i = 0; i < kelimeler.length; i++) {
-          final kelime = kelimeler[i];
-          final kok = kokBul(kelime);
+  // 4. ANA YORUMLAMA MOTORU
+  static String yorumla(String metin) {
+    // Metni cümlelere ayır (Nokta, ünlem, soru işareti)
+    final cumleler = metin.toLowerCase().split(RegExp(r'[.!?]')).where((c) => c.trim().isNotEmpty).toList();
+    
+    final List<Ruyasembolu> bulunanSemboller = [];
+    final Set<String> bulunanAnahtarlar = {};
+    final List<String> tespitEdilenEylemler = [];
 
-          if (kelime == eslesen || kok == eslesen || (eslesen.length >= 4 && kelime.contains(eslesen))) {
-            
-            // Olumsuzluk Penceresi Kontrolü
-            final baslangic = (i - 4).clamp(0, kelimeler.length);
-            final pencere = kelimeler.sublist(baslangic, (i + 2).clamp(0, kelimeler.length)).join(' ');
-            bool olumsuzMu = olumsuzluklar.any((o) => pencere.contains(o));
+    // Cümle cümle analiz et
+    for (String cumle in cumleler) {
+      // Cümleyi kelimelere ayır
+      final kelimeler = cumle.replaceAll(RegExp(r'[^\w\sğüşıöç]'), ' ').split(RegExp(r'\s+')).where((k) => k.isNotEmpty).toList();
+      
+      for (int i = 0; i < kelimeler.length; i++) {
+        final kelime = kelimeler[i];
+        final kok = _kokBul(kelime);
 
-            if (!olumsuzMu) {
-              if (!bulunanAnahtarlar.contains(sembol.anahtar)) {
-                bulunanlar.add(sembol);
-                bulunanAnahtarlar.add(sembol.anahtar);
-              }
-              
-              // Eylem var mı bak (sembolün etrafındaki kelimelerde)
-              for (int j = (i - 2).clamp(0, kelimeler.length); j < (i + 3).clamp(0, kelimeler.length); j++) {
-                final eylem = eylemYorumlari.keys.firstWhere((e) => kelimeler[j].contains(e), orElse: () => '');
-                if (eylem.isNotEmpty && !bulunanEylemler.contains(eylemYorumlari[eylem]!)) {
-                  bulunanEylemler.add(eylemYorumlari[eylem]!);
-                }
-              }
+        // A) EYLEM TESPİTİ (Cümle içindeki eylemleri bul)
+        for (final eylemKey in eylemYorumlari.keys) {
+          if (kelime.contains(eylemKey) || kok.contains(eylemKey)) {
+            if (!tespitEdilenEylemler.contains(eylemYorumlari[eylemKey])) {
+              tespitEdilenEylemler.add(eylemYorumlari[eylemKey]!);
             }
-            bulundu = true;
-            break;
           }
         }
-        if (bulundu) break;
+
+        // B) SEMBOL TESPİTİ
+        for (final sembol in tumSemboller) {
+          if (bulunanAnahtarlar.contains(sembol.anahtar)) continue; // Zaten bulunduysa geç
+
+          for (final eslesen in sembol.eslesenKelimeler) {
+            // Eşleşme Kontrolü (Tam eşleşme veya Kök eşleşmesi)
+            if (kelime == eslesen || kok == eslesen || (eslesen.length >= 4 && kelime.contains(eslesen))) {
+              
+              // OLUMSUZLUK PENCERESİ KONTROLÜ (Bu cümlenin içinde olumsuzluk var mı?)
+              // Sembolün bulunduğu yerin 4 kelime öncesi ve 2 kelime sonrasına bak
+              final baslangic = (i - 4).clamp(0, kelimeler.length);
+              final bitis = (i + 3).clamp(0, kelimeler.length);
+              final pencere = kelimeler.sublist(baslangic, bitis).join(' ');
+              
+              bool olumsuzMu = olumsuzluklar.any((o) => pencere.contains(o));
+
+              if (!olumsuzMu) {
+                bulunanSemboller.add(sembol);
+                bulunanAnahtarlar.add(sembol.anahtar);
+              }
+            }
+          }
+        }
       }
     }
 
-    if (bulunanlar.isEmpty) {
-      return 'Rüyanızda bilinen belirgin bir sembol tespit edilemedi. Ancak bilinçaltınız size bir mesaj vermeye çalışıyor olabilir. Lütfen rüyanızı daha detaylı anlatın veya farklı kelimeler kullanın. (İpucu: Su, yılan, uçmak, ev, saç gibi net semboller kullanmayı deneyin.)';
+    // Bilinmeyen sembol durumu
+    if (bulunanSemboller.isEmpty) {
+      return 'Rüyanızda tanıdığım belirgin bir sembol tespit edemedim. Ancak bu, rüyanızın anlamsız olduğu anlamına gelmez. Rüyanızı daha net hatırladığınız detaylarla (örneğin; neredeydiniz, kim vardı, ne yapıyordunuz?) tekrar anlatırsanız sizi daha iyi anlayabilirim.';
     }
 
-    // 5. ADIM: Duygu Puanlaması
+    // DUYGU SKORLAMASI
     double korkuSkor = 0, huzunSkor = 0, mutlulukSkor = 0;
-    for (final kelime in kelimeler) {
+    final tumKelimeler = metin.toLowerCase().split(RegExp(r'\s+'));
+    
+    for (final kelime in tumKelimeler) {
       if (korkuKelimeleri.containsKey(kelime)) korkuSkor += korkuKelimeleri[kelime]!;
       if (huzunKelimeleri.containsKey(kelime)) huzunSkor += huzunKelimeleri[kelime]!;
       if (mutlulukKelimeleri.containsKey(kelime)) mutlulukSkor += mutlulukKelimeleri[kelime]!;
     }
 
-    // Yoğunluk çarpanı
-    for (final kelime in kelimeler) {
+    for (final kelime in tumKelimeler) {
       if (yogunlukKelimeleri.containsKey(kelime)) {
         if (korkuSkor > 0) korkuSkor *= yogunlukKelimeleri[kelime]!;
         if (mutlulukSkor > 0) mutlulukSkor *= yogunlukKelimeleri[kelime]!;
       }
     }
 
-    // 6. ADIM: Metni İnşa Et
+    // YORUM METNİNİ OLUŞTURMA (Dinamik ve Akıcı)
     final buffer = StringBuffer();
     
-    // Giriş
-    if (korkuSkor >= 4) {
-      buffer.writeln('Rüyanız belirgin bir tehdit ya da kontrol kaybı hissi taşıyor. Bilinçaltınız sizi güçlü bir şekilde uyarıyor.\n');
-    } else if (korkuSkor >= 2) {
-      buffer.writeln('Rüyanızda hafif bir endişe ve tedirginlik seziliyor. İçsel bir huzursuzluk yaşıyorsunuz.\n');
-    } else if (mutlulukSkor > korkuSkor) {
-      buffer.writeln('Rüyanızın genel tonu huzurlu ve umut verici. Pozitif enerjiniz dikkat çekiyor.\n');
+    // 1. Giriş (Duygu Durumu)
+    if (korkuSkor >= 3) {
+      buffer.writeln('Rüyanızın genel atmosferinde belirgin bir kaygı ve tehdit hissi hakim. Bilinçaltınız sizi güçlü bir şekilde uyarıyor.\n');
+    } else if (huzunSkor >= 2 && huzunSkor > mutlulukSkor) {
+      buffer.writeln('Rüyanızda derin bir hüzün veya kayıp hissi öne çıkıyor. Geçmişten gelen bazı duyguların açığa çıkmaya çalıştığını görüyorum.\n');
+    } else if (mutlulukSkor >= 2 && mutlulukSkor > korkuSkor) {
+      buffer.writeln('Rüyanızın enerjisi oldukça pozitif ve huzurlu. İçsel dinginliğiniz rüyanıza yansımış durumda.\n');
     } else {
-      buffer.writeln('Rüyanız daha çok sembolik ve düşündürücü bir atmosfer taşıyor. Bilinçaltınız size mesajlar veriyor.\n');
+      buffer.writeln('Rüyanız sembolik bir dille bilinçaltınızdan size mesajlar veriyor. Olayları ve sembolleri bir bütün olarak incelediğimde şunları görüyorum:\n');
     }
 
-    // Semboller
-    for (int i = 0; i < bulunanlar.length; i++) {
-      buffer.writeln('${i + 1}. ${bulunanlar[i].anahtar.toUpperCase()}');
-      buffer.writeln('${bulunanlar[i].yorum}');
+    // 2. Sembollerin ve Eylemlerin Harmanlanması
+    buffer.writeln('--- SEMBOLİK ANALİZ ---\n');
+    
+    for (int i = 0; i < bulunanSemboller.length; i++) {
+      final sembol = bulunanSemboller[i];
+      buffer.writeln('• ${sembol.anahtar.toUpperCase()}');
       
-      if (bulunanEylemler.isNotEmpty && i == 0) {
-        // Eylemleri ilk sembole bağlayalım
-        buffer.writeln('\nRüyanızdaki eylemlerin analizi: ${bulunanEylemler.join(' ')}');
+      // Sembolün temel yorumu
+      buffer.writeln('${sembol.yorum}');
+      
+      // Eğer bu rüyada tespit edilen eylemler varsa, ilk sembolün altına akıcı bir şekilde bağla
+      if (i == 0 && tespitEdilenEylemler.isNotEmpty) {
+        buffer.writeln('\nRüyanızdaki eylemlerin analizi:');
+        for (var eylem in tespitEdilenEylemler) {
+          buffer.writeln('- $eylem');
+        }
       }
       buffer.writeln();
     }
 
-    buffer.writeln('---');
-    buffer.writeln('Usta Yorumu: Rüyalar, ruhumuzun aynasıdır. Size tavsiyem, bu yorumları birer kesin kehanet olarak görmek yerine, kendi içinize dönüp düşünmeniz için bir fırsat bilmenizdir. Bilinçaltınız size ne anlatmaya çalışıyor? Hangi duygularınızı bastırıyorsunuz veya hangi fırsatları görmezden geliyorsunuz? Unutmayın, rüyaların asıl gücü, size kendinizi hatırlatmasıdır.');
-    buffer.writeln('\nNot: Bu yorumlar geleneksel İslami tabir geleneği ve temel psikolojik sembolizm esas alınarak hazırlanmıştır. Sadece eğlence ve farkındalık amaçlıdır. Bilimsel veya tıbbi bir teşhis niteliği taşımaz.');
+    // 3. Kapanış (Usta Yorumu)
+    buffer.writeln('--- GENEL DEĞERLENDİRME ---');
+    buffer.writeln('Unutmayın, rüyalar birer kehanet değil, ruhumuzun aynasıdır. Size tavsiyem, bu yorumları birer kesin gerçek olarak görmek yerine, kendi içinize dönüp düşünmeniz için bir fırsat bilmenizdir. Bilinçaltınız size ne anlatmaya çalışıyor? Hangi duygularınızı bastırıyorsunuz?');
+    buffer.writeln('\nNot: Bu yorumlar geleneksel İslami tabirler ve temel psikolojik sembolizm esas alınarak, tamamen yerel (cihaz içi) bir analiz motoruyla hazırlanmıştır. Dini kesin hükümler veya tıbbi teşhisler içermez.');
 
     return buffer.toString();
   }
