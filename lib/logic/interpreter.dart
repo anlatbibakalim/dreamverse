@@ -3,7 +3,7 @@ import '../data/symbols.dart';
 class Interpreter {
   static String yorumla(String metin) {
     final kucukMetin = metin.toLowerCase();
-    final List<RüyaSembolü> bulunanlar = [];
+    final List<Ruyasembolu> bulunanlar = [];
 
     for (final sembol in tumSemboller) {
       for (final kelime in sembol.eslesenKelimeler) {
