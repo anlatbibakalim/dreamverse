@@ -1,64 +1,47 @@
 import '../data/symbols.dart';
 
 class Interpreter {
-  static final List<String> _ekler = [
-    'larından', 'lerinden', 'larıyla', 'leriyle', 'lardan', 'lerden', 'lardaki', 'lerdeki',
-    'mızdan', 'mizden', 'muzdan', 'müzden', 'ları', 'leri', 'lar', 'ler',
-    'ımız', 'imiz', 'umuz', 'ümüz', 'ınız', 'iniz', 'unuz', 'ünüz',
-    'ım', 'im', 'um', 'üm', 'ın', 'in', 'un', 'ün', 
-    'nın', 'nin', 'nun', 'nün', 'ndan', 'nden', 'ntan', 'nten',
-    'da', 'de', 'ta', 'te', 'dan', 'den', 'tan', 'ten', 'nda', 'nde',
-    'a', 'e', 'ya', 'ye', 'na', 'ne', 'yı', 'yi', 'yu', 'yü',
-    'ı', 'i', 'u', 'ü', 'yı', 'yi', 'yu', 'yü',
-    'la', 'le', 'yla', 'yle', 'ca', 'ce', 'ça', 'çe',
-    'lık', 'lik', 'luk', 'lük', 'cı', 'ci', 'cu', 'cü', 'çı', 'çi', 'çu', 'çü',
-    'sı', 'si', 'su', 'sü', 'sını', 'sini', 'sunu', 'sünü',
-    'mış', 'miş', 'muş', 'müş', 'mıştı', 'mişti', 'yor', 'yordu', 'yorum', 'yorsun', 'yorken',
-    'yodu', 'yodum', 'yodun', 'caktı', 'cekti', 'acaktım', 'ecektim',
-    'dı', 'di', 'du', 'dü', 'tı', 'ti', 'tu', 'tü', 'acak', 'ecek', 'acağım', 'eceğim'
-  ];
-
-  static String _kokBul(String kelime) {
-    String kok = kelime;
-    for (String ek in _ekler) {
-      if (kok.endsWith(ek) && kok.length > ek.length + 2) {
-        kok = kok.substring(0, kok.length - ek.length);
-        break;
-      }
-    }
-    if (kok.endsWith('yod')) kok = kok.replaceAll('yod', 'yor');
-    if (kok.endsWith('cak')) kok = kok.replaceAll('cak', 'yacak');
-    if (kok.endsWith('ğ')) kok = kok.replaceAll('ğ', 'k'); 
-    if (kok.endsWith('b')) kok = kok.replaceAll('b', 'p');
-    if (kok.endsWith('c')) kok = kok.replaceAll('c', 'ç');
-    if (kok.endsWith('d')) kok = kok.replaceAll('d', 't');
-    if (kok.endsWith('y') && kok.length > 3) kok = kok.substring(0, kok.length - 1);
-    return kok;
-  }
-
   static String yorumla(String metin) {
     final kucukMetin = metin.toLowerCase();
+    
+    // Noktalama işaretlerini temizle ve kelimelere ayır
     final temizMetin = kucukMetin.replaceAll(RegExp(r'[^\w\sğüşıöç]'), ' ');
     final kelimeler = temizMetin.split(RegExp(r'\s+')).where((k) => k.isNotEmpty).toList();
     
     final List<Ruyasembolu> bulunanlar = [];
     final Set<String> bulunanAnahtarlar = {};
 
-    // Geniş Arama Motoru
+    // YENİ MANTIK: Kelimeleri parçalamak yerine, sembol köklerini kelimenin içinde ara.
     for (final sembol in tumSemboller) {
       if (bulunanAnahtarlar.contains(sembol.anahtar)) continue;
 
       for (final eslesen in sembol.eslesenKelimeler) {
         bool bulundu = false;
-        final eslesenKok = _kokBul(eslesen);
-
+        
         for (final kelime in kelimeler) {
-          final kelimeKok = _kokBul(kelime);
           
-          if (kelime == eslesen) { bulundu = true; break; }
-          if (kelimeKok == eslesenKok && kelimeKok.length >= 2) { bulundu = true; break; }
-          if (kelime.startsWith(eslesen) && eslesen.length >= 3) { bulundu = true; break; }
-          if (eslesenKok.length >= 4 && kelime.contains(eslesenKok)) { bulundu = true; break; }
+          // 1. Tam Eşleşme (Ör: "su" == "su")
+          if (kelime == eslesen) { 
+            bulundu = true; 
+            break; 
+          }
+          
+          // 2. Esnek Eşleşme (Kökü kelimenin içinde ara)
+          // Eğer aranan sembol 4 harf veya daha uzunsa (ör: yıka, yılan, altın), kelimenin içinde geçebilir.
+          // Ör: "yıkıyorum" içinde "yıka" geçer -> Eşleşir.
+          // Ör: "saçlarım" içinde "saç" (3 harf) geçer ama aşağıdaki kurala takılır.
+          if (eslesen.length >= 4 && kelime.contains(eslesen)) {
+            bulundu = true;
+            break;
+          }
+
+          // 3. Kısa Kelimeler İçin Başlangıç Koruması
+          // 3 harfli kelimeler (uç, at, ay, su) sadece kelimenin BAŞINDA aranır (ör: "uçtu", "uçak").
+          // Böylece "musluk" içindeki "uç" yakalanmaz. Ama "saçlarım" içindeki "saç" yakalanır.
+          if (eslesen.length == 3 && kelime.startsWith(eslesen)) {
+            bulundu = true;
+            break;
+          }
         }
         
         if (bulundu) {
@@ -98,10 +81,8 @@ class Interpreter {
     
     for (int i = 0; i < bulunanlar.length; i++) {
       buffer.writeln('${i + 1}. Sembol:');
-      // Sembolün adını büyük harfle yazdıralım
       buffer.writeln('${bulunanlar[i].anahtar.toUpperCase()}\n');
       
-      // Yorumu genişletelim
       String genisYorum = bulunanlar[i].yorum;
       genisYorum += ' Bu sembol size, hayatınızın mevcut gidişatı hakkında önemli ipuçları veriyor. Bilinçaltınız bu görüntüyle, hem geçmiş deneyimlerinizden ders almanızı hem de geleceğe daha hazırlıklı bakmanızı sağlamaya çalışıyor.';
       
